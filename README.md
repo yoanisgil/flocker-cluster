@@ -1,4 +1,4 @@
-# Creating a Flocker Cluster using Docker and Ansible
+# Running Jenkins on top of a  Flocker Cluster using Docker and Ansible
 
 At [Valtech Canada](https://www.valtech.com/)  we're always looking for new challenges and ways to improve our technology stack which is why I set my self onto the task of building a [Jenkins](https://jenkins.io/index.html) cluster using Docker's [Multi-Host Networking](https://docs.docker.com/engine/userguide/networking/get-started-overlay/)  , [Swarm](https://docs.docker.com/swarm/overview/) and [Compose](https://docs.docker.com/compose/overview/).
 
@@ -11,7 +11,7 @@ Before I begin I'd like to clarify that this article was written using:
 It also makes use of Amazon Web Services (AWS for short) EC2 instances for which you need to create an account [here](https://aws.amazon.com) if you don't already have one.
 
 #Intro
- The ultimate goal is to be able to run everything inside containers, which of course demands the ability to run a Jenkins Master and as many slaves as possible inside containers. So let me state my goals in a concise way:
+ The  goal is to be able to run everything inside containers, which of course demands the ability to run a Jenkins Master and as many slaves as possible inside containers. So let me state my goals in a concise way:
 
     1 - The Jenkins Master can run in any node of the Swarm cluster and the deployment must be durable.
     2 - Jenkins slaves can run in any node of the Swarm Cluster and they must provide out of the box support for building Docker images as well as for running containers.
@@ -20,17 +20,19 @@ Goal #1 is very important and it's what this article is mainly about and there w
 
 Let's break goal #1 into pieces:
     
-    1.a - The Jenkins Master can run in any node of the Swarm Cluster
-    1.b - The deployment of the Jenkins Master must be durable
+    1.a - The Jenkins Master can run in any node of the Swarm Cluster.
+    1.b - The deployment of the Jenkins Master must be durable.
 
 The first item does not take much thinking, nor much time to implement, since all we need is a properly configured Swarm Cluster and that's about it. But having a durable deployment of the Jenkins master, well that's where the fun begins :).
 
 But first, what does *durable deployment* means in this specific context? What I'd like to achieve is:
 
-    1 - In the case of failure, like when a Swarm Node crashes, we should not incur in any data loss (and possible no data corruption). 
-    2 - It should be as easy as possible to relocate the Jenkins Master to a different node on the Swarm Cluster while keeping all existing build configurations, jobs definitions, etc.
+     - In the case of failure, like when a Swarm Node crashes, we should not incur in any data loss (and possible no data corruption). 
+     - It should be as easy as possible to relocate the Jenkins Master to a different node on the Swarm Cluster while keeping all existing build configurations, jobs definitions, etc.
 
-If you've been into Docker long enough you will know that those two statements above are not easy to deal with, specially in the context of a Swarm Cluster. Why? To start with we need to make sure that the Jenkins installation folder it's externalized, i.e it's placed inside a data volume so that changes made to the Jenkins configuration can survive across containers. But this is not good enough in the case of Swarm Cluster since the container might be scheduled for execution in any node of the Swarm Cluster. 
+If you've been into Docker long enough you will know that those two statements above are not easy to deal with, specially in the context of a Swarm Cluster. Why? 
+
+To start with we need to make sure that the Jenkins installation folder it's externalized, i.e it uses a data volume so that changes made to the Jenkins configuration can survive across containers. But this is not good enough in the case of Swarm Cluster since the container might be scheduled for execution in any node of the Swarm Cluster. 
 
 Luckily for us support for volume plugins was added as an [experimental feature in Docker 1.7.0](https://github.com/docker/docker/blob/master/CHANGELOG.md#170-2015-06-16) and made it to production grade [at version 1.8.0](https://github.com/docker/docker/blob/master/CHANGELOG.md#180-2015-08-11) . So, how exactly does volume plugins comes into rescue? Let's take a look at the [Volume Plugin documentation](https://docs.docker.com/engine/extend/plugins_volume/):
 
@@ -41,7 +43,7 @@ which is a way of saying that data volumes are no longer bounded to a single hos
 - [Flocker by ClusterHQ](https://clusterhq.com/flocker/introduction/)
 - [OpenStorage](https://github.com/libopenstorage/openstorage)
 
-Unfortunately I've not being able to use OpenStorage as much I'd love to, mainly because of [this issue](https://github.com/libopenstorage/openstorage/issues/119) and also because I really wanted to give it a try running a Swarm Cluster on AWS (even after some asshole stole my AWS credentials I accidentally committed to GitHub and I ended up with a $2400 bill on my AWS account. But that's another story for different post). This leaves us with FlockerHQ.
+Unfortunately I've not being able to use OpenStorage as much I'd love to, mainly because of [this issue](https://github.com/libopenstorage/openstorage/issues/119) and also because I really wanted to give it a try running a Swarm Cluster on AWS (even after some assh* stole my AWS credentials I accidentally committed to GitHub and I ended up with a $2400 bill on my AWS account. But that's another story for different post). This leaves us with FlockerHQ.
 
 # Enter Flocker
 
@@ -57,25 +59,25 @@ Et voilà! That's precisely what we need!! Now, when it comes to installing Floc
 - Using a [CLoud Formation](https://aws.amazon.com/cloudformation/) template
 - Manual installation 
 
-I must confess that I've zero knowledge on Cloud Formation which is why I went for the manual installation option. I did give a try to using the Cloud Formation template but it creates by default M3 instances which are too expensive for me, so I was left with no choice but manual installation. I admit I could have tried editing the template but where is the fun in that :D? Anyhow Manual installation it was and this is where things gets even more interesting.
+I must confess that I've zero knowledge on Cloud Formation which is why I went for the manual installation option. I did give a try to using the Cloud Formation template but it creates by default M3 instances which are too expensive for me, so I was left with no choice but manual installation. I admit I could have tried editing the Cloud Formation template but where is the fun in that :D? Anyhow Manual installation it was and this is where things gets even more interesting.
 
 
 # Installing Flocker manually
 
 Installing Flocker manually it's not an easy task and you can see by your self if you follow [the manual](https://docs.clusterhq.com/en/latest/docker-integration/manual-install.html). I believe I did about 2 manual installs before realizing that I needed a way of automating all of the work of installing software dependencies, generating certificates/private keys, etc. Luckily for me I remembered [this post](http://nathanleclaire.com/blog/2015/11/10/using-ansible-with-docker-machine-to-bootstrap-host-nodes/) by the great Nathan LeClaire which explains how use Docker/Compose and [Ansible](https://www.ansible.com/) to provision Docker Machine nodes.
 
-As a result I've created  [flokenstein](https://github.com/yoanisgil/flokenstein) which eases the creation of Flocker cluster. Please be aware that as the moment of writing this script only supports AWS.
+As a result I've created  [flokenstein](https://github.com/yoanisgil/flokenstein) which eases the creation of Flocker cluster. Please be aware that as the moment of writing this script only supports AWS. Go ahead and [follow the instructions](https://github.com/yoanisgil/flokenstein/blob/master/README.md) and get back once you're done ;)
 
 # Running Jenkins with Flocker
 
-Assuming you went through the steps of setting up a Flocker Cluster described in the [flokenstein README](https://github.com/yoanisgil/flokenstein/blob/master/README.md), you should now be in the position of running a Jenkins container which takes avantage of Flocker. First:
+By now you should have a working Swarm/Flocker cluster and you shoul be in the position of running a Jenkins container which takes advantage of Flocker. First:
 
     git clone https://github.com/yoanisgil/flocker-cluster.git
     cd flocker-cluster
 
 Since we want to keep the entire Jenkins folder inside a Flocker volume we need to make sure it's indeed copied over to the target volume. First lets launch our Jenkins container:
 
-    $JENKINS_HOME=/tmp/jenkins_home docker-compose up -d jenkins
+    $ JENKINS_HOME=/tmp/jenkins_home docker-compose up -d jenkins
 
 which should produce something like this:
         
@@ -85,7 +87,7 @@ which should produce something like this:
         swarm-node-01: Pulling jenkins:2.0-beta-1... : downloaded
         swarm-master: Pulling jenkins:2.0-beta-1... : downloaded
 
-and if everything went all right then running `docker-compose logs` should report back lines like the ones below:
+and if everything went all right, then running `docker-compose logs` should report back lines like the ones below:
 
         jenkins_1 | INFO: Loaded all jobs
         jenkins_1 | Apr 05, 2016 3:15:47 AM jenkins.InitReactorRunner$1 onAttained
@@ -100,7 +102,7 @@ Let's grab the IP address where our Jenkins instance is running by using `docker
     $ docker ps --format="{{.Ports}} {{.Names}}"
     52.90.38.105:8080->8080/tcp, 50000/tcp swarm-node-01/flockercluster_jenkins_1
 
-This clearly states than Jenkins is available at `http://52.90.38.105:8080` (*NOTE*: You will most certainly get a different IP address when running `docker ps --format="{{.Ports}} {{.Names}}"`). You need to make sure that port 8080 is open and available to the world, in which case the Inbound Ports configuration for the `docker-machine` security group should look like this:
+This clearly states than Jenkins is available at `http://52.90.38.105:8080` (*NOTE*: You will most certainly get a different IP address when running `docker ps --format="{{.Ports}} {{.Names}}"`) so make sure you grab the right one. Also, make sure that port 8080 is open and available to the world, in which case the Inbound Ports configuration for the `docker-machine` security group should look like this:
 
 ![Jenkins Inbound port config](https://raw.githubusercontent.com/yoanisgil/flocker-cluster/master/jenkins-security-group-config.png)
 
@@ -118,7 +120,7 @@ this could return several lines so make sure you grab the ID of the container wh
 
 so now I run:
 
-    $ docker exec -ti  b94dcc8bad09 cp -avr /var/jenkins_home /tmp
+    $ docker exec -u root -ti  b94dcc8bad09 cp -avr /var/jenkins_home /tmp
 
 to copy all files from ```/var/jenkins_home```to ```/tmp/jenkins_home```
 
@@ -130,17 +132,17 @@ With the Jenkins home already copied to the Flocker volume we can now recreate o
     Creating volume "flockercluster_jenkins" with flocker driver
     Creating flockercluster_jenkins_1
 
-The later operation might take some time to complete, specially if the container is scheduled to run on a different machine than the previous run, since the Flocker volume (which is actually an [EBS volume](https://aws.amazon.com/ebs/) needs to be re-attached to the node running the Jenkins container.
+The later operation might take some time to complete, specially if the container is scheduled to run on a different machine than the previous run, since the Flocker volume (which is actually an [EBS volume](https://aws.amazon.com/ebs/)) needs to be re-attached to the node running the Jenkins container.
 
 So again, let's grab the IP address where the Jenkins container is running:
 
-    docker ps --format="{{.Ports}} {{.Names}}"
+    $ docker ps --format="{{.Ports}} {{.Names}}"
     52.90.38.105:8080->8080/tcp, 50000/tcp swarm-node-01/flockercluster_jenkins_1
 
 and if we go visit the configured IP address on port 8080 we should see the same welcome screen as before.  But this time we go through the installation procedure. So let's grab that default administrator password Jenkins created for us:
 
     $ docker ps --format="{{.ID}} {{.Image}}" 
-    a5d22f24c133
+    a5d22f24c133 jenkins:2.0-beta-1
     $ docker exec -ti a5d22f24c133 cat /var/jenkins_home/secrets/initialAdminPassword
     AUTO_GENERATED_JENKINS_ADMIN_PASSWORD
 
